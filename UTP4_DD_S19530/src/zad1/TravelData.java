@@ -1,107 +1,71 @@
 package zad1;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.text.NumberFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class TravelData {
-
-    private Properties dictionary;
-
-    private List<Record> data;
+    private List<Travel> list;
 
     public TravelData(File dataDir) {
-        data = new ArrayList<>();
+        Stream<Path> paths;
+        try {
+            paths = Files.walk(dataDir.toPath());
+            this.list = paths
+                    .filter(Files::isRegularFile)
+                    .flatMap(p -> {
+                        try {
+                            return Files.lines(p);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            return null;
+                        }
+                    })
+                    .map(l -> {
+                        if (l == null) {
+                            return null;
+                        }
 
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-
-        Arrays.stream(Objects.requireNonNull(dataDir.listFiles())).forEach(file -> {
-            try {
-                Files.lines(Paths.get(file.getPath())).forEach(line -> {
-                    String[] lineData = line.split("\t");
-
-                    int i = 0;
-
-                    Record record;
-
-                    Locale locale = Locale.forLanguageTag(lineData[i++].replace("_", "-"));
-                    NumberFormat numberFormat = NumberFormat.getInstance(locale);
-
-                    try {
-                        record = new Record(
-                                locale,
-                                lineData[i++],
-                                simpleDateFormat.parse(lineData[i++]),
-                                simpleDateFormat.parse(lineData[i++]),
-                                lineData[i++],
-                                numberFormat.parse(lineData[i++]).doubleValue(),
-                                lineData[i]
-                        );
-
-                        data.add(record);
-                    } catch (ParseException e) {
-                        e.printStackTrace();
-                    }
-                });
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            try (InputStream input = new FileInputStream("dictionary.properties")) {
-                dictionary = new Properties();
-                dictionary.load(input);
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        });
-    }
-
-    List<String> getOffersDescriptionsList(String loc, String dateFormat) {
-        List<String> descList = new ArrayList<>();
-
-        Locale destLocale = Locale.forLanguageTag(loc.replace("_", "-"));
-        NumberFormat numberFormat = NumberFormat.getInstance(destLocale);
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat(dateFormat);
-
-        data.forEach(d -> {
-            StringBuilder sb = new StringBuilder();
-
-            String country = translateCountry(d.getCountryCode(), destLocale, d.getCountryName());
-            sb.append(country).append(" ");
-            sb.append(simpleDateFormat.format(d.getDateFrom())).append(" ");
-            sb.append(simpleDateFormat.format(d.getDateTo())).append(" ");
-            sb.append(translateWord(d.getCountryCode(), destLocale, d.getLocation())).append(" ");
-            sb.append(numberFormat.format(d.getPrice())).append(" ");
-            sb.append(d.getCurrency());
-
-            descList.add(sb.toString());
-        });
-
-        return descList;
-    }
-
-    private String translateCountry(Locale inLocale, Locale outLocale, String countrName) {
-        for (Locale l : Locale.getAvailableLocales()) {
-            if (l.getDisplayCountry(inLocale).equals(countrName)) {
-                return l.getDisplayCountry(outLocale);
-            }
+                        String[] arr = l.split("\t");
+                        try {
+                            return new Travel(
+                                    arr[0],
+                                    arr[1],
+                                    arr[2],
+                                    arr[3],
+                                    arr[4],
+                                    arr[5],
+                                    arr[6]
+                            );
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return null;
+                        }
+                    })
+                    .filter(l -> l != null)
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        return null;
     }
 
-    private String translateWord(Locale inLocale, Locale outLocale, String word) {
-        return dictionary.getProperty(inLocale.getLanguage() + "-" + outLocale.getLanguage() + "." + word, word);
+    public List<String> getOffersDescriptionsList(String locale, String dateFormat) {
+        Locale l = Locale.forLanguageTag(locale.replace('_', '-'));
+
+        return this.list
+                .stream()
+                .map(t -> t.toLocalizedString(l))
+                .collect(Collectors.toList());
+
     }
 
-    List<Record> getData() {
-        return data;
+    public List<Travel> getOffersList() {
+        return this.list;
     }
+
 }
